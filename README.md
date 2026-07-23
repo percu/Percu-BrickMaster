@@ -63,3 +63,27 @@ rm -rf node_modules .npm-test-cache dist
 ## Data and cache
 
 SQLite data is stored under `data/`. Part images and thumbnails are cached locally under `local_storage/`.
+
+# Screenshots
+
+## Main Screen
+
+<img width="1031" height="984" alt="image" src="https://github.com/user-attachments/assets/ed0f778d-bbaa-480a-ba9f-54e510d3a501" />
+
+## Owned Set Parts
+
+<img width="1025" height="978" alt="image" src="https://github.com/user-attachments/assets/0f0c407d-fc9c-41f7-825a-3c198415aefe" />
+
+## Item Part from an Owned Set
+
+<img width="1175" height="753" alt="image" src="https://github.com/user-attachments/assets/9eae5c45-1eec-45d2-8133-a537a9394a9f" />
+
+## Inventory Screen
+
+<img width="1026" height="743" alt="image" src="https://github.com/user-attachments/assets/7b2d9e35-8000-48ce-a72e-266ac69afc97" />
+
+## Item Part from Inventory
+
+<img width="759" height="795" alt="image" src="https://github.com/user-attachments/assets/0c66ba27-6129-42e1-a150-ada7b8558a69" />
+
+
