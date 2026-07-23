@@ -59,6 +59,11 @@ app.get('/api/sets/:setNum/parts', (req, res) => res.json(db.prepare(`
   WHERE i.set_num=? ORDER BY i.is_spare, p.name
 `).all(req.params.setNum)));
 app.get('/api/wishlist', (_, res) => res.json(db.prepare(`SELECT s.* FROM wishlist w JOIN sets s ON s.set_num=w.set_num ORDER BY w.added_at DESC`).all()));
+app.get('/api/wishlist/summary', (_, res) => res.json(db.prepare(`
+  SELECT COUNT(DISTINCT i.element_id) AS unique_parts, COALESCE(SUM(i.quantity),0) AS total_parts
+  FROM wishlist w JOIN inventories i ON i.set_num=w.set_num
+  WHERE i.is_spare=0
+`).get()));
 app.delete('/api/wishlist/:setNum', (req, res) => { db.prepare('DELETE FROM wishlist WHERE set_num=?').run(req.params.setNum); res.status(204).end(); });
 
 app.get('/api/inventory', (req, res) => {
