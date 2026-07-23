@@ -1,6 +1,8 @@
 # Percu BrickMaster
 
-Percu BrickMaster is a personal LEGO collection, inventory, and wishlist manager powered by the Rebrickable API.
+**Percu BrickMaster is a personal LEGO collection, inventory, and wishlist manager powered by the Rebrickable API.**
+
+<img width="1983" height="793" alt="image" src="https://github.com/user-attachments/assets/f0411892-7691-41a8-9bec-566bd67109c6" />
 
 ## Requirements
 
