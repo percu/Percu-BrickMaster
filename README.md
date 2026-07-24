@@ -70,7 +70,7 @@ SQLite data is stored under `data/`. Part images and thumbnails are cached local
 
 ## Main Screen
 
-<img width="1031" height="984" alt="image" src="https://github.com/user-attachments/assets/ed0f778d-bbaa-480a-ba9f-54e510d3a501" />
+<img width="1024" height="1017" alt="image" src="https://github.com/user-attachments/assets/0194fab6-c59d-4cf4-b80f-ca3493d8b02d" />
 
 ## Owned Set Parts
 
