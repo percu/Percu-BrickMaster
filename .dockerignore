@@ -1,0 +1,9 @@
+.git/
+.vscode/
+node_modules/
+dist/
+data/
+local_storage/
+.npm-test-cache/
+.env
+*.log

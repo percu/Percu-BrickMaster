@@ -35,3 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_element ON inventories(element_id);
 
 // Lightweight migration for databases created before set notes were introduced.
 try { db.exec("ALTER TABLE sets ADD COLUMN notes TEXT NOT NULL DEFAULT ''"); } catch (error) { if (!String(error.message).includes('duplicate column name')) throw error; }
+try { db.exec('ALTER TABLE inventories ADD COLUMN owned_quantity INTEGER'); } catch (error) { if (!String(error.message).includes('duplicate column name')) throw error; }
+try { db.exec("ALTER TABLE inventories ADD COLUMN condition TEXT NOT NULL DEFAULT 'complete'"); } catch (error) { if (!String(error.message).includes('duplicate column name')) throw error; }
+try { db.exec("ALTER TABLE inventories ADD COLUMN notes TEXT NOT NULL DEFAULT ''"); } catch (error) { if (!String(error.message).includes('duplicate column name')) throw error; }
+db.exec(`UPDATE inventories SET owned_quantity = quantity * COALESCE((SELECT owned_quantity FROM sets WHERE sets.set_num=inventories.set_num), 0) WHERE owned_quantity IS NULL`);

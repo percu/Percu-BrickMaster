@@ -4,7 +4,32 @@ All notable changes to Percu BrickMaster are documented in this file.
 
 The project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Add changes to **Unreleased** during development, then move them into a versioned section when creating a GitHub release.
 
-## [Unreleased]
+## [1.0.2] - 2026-07-24
+
+### Added
+
+- Per-part ownership tracking for Owned Sets, including usable quantity, Missing/Broken condition, and optional notes.
+- Missing-part counts and filters on the Owned Sets page and within an Owned Set.
+- Missing-part indicators in Owned Set cards, part cards, Inventory breakdowns, and Owned Set part-location lists.
+- In-app confirmation dialogs for Wishlist removal and reducing an Owned Set quantity.
+- In-app error dialog for Rebrickable set-sync failures.
+- Wishlist part modals now show the collection-wide total owned for the selected part.
+- Docker support with a production-ready `Dockerfile` and `.dockerignore`.
+
+### Changed
+
+- Inventory, collection totals, and Wishlist completeness now use each part's actual usable quantity rather than assuming every owned set is complete.
+- Inventory location lists are ordered by the highest owned quantity first.
+- Part-location modals identify the currently opened Owned Set, move it to the top, highlight it, and show both set-specific and collection-wide totals.
+- Search now supports Design ID in every part view.
+- Rebrickable API errors now use clear status-specific messages for invalid requests, invalid API keys, access errors, missing sets, and throttling.
+
+### Fixed
+
+- Missing-part counts remain visible after partially restoring a part quantity.
+- Missing-part warning badges no longer overlap required part quantities or Inventory totals.
+- Owned Set missing-parts filtering remains stable after sorting and UI refreshes.
+- Prevented modal observer loops that could make the interface unresponsive.
 
 ## [1.0.1] - 2026-07-23
 
