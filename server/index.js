@@ -18,13 +18,12 @@ function storeSet(record, owned = false) {
     owned_quantity=CASE WHEN ? THEN sets.owned_quantity + 1 ELSE sets.owned_quantity END,synced_at=excluded.synced_at`)
     .run(record.set_num, record.name, record.year, record.num_parts, record.set_img_url, owned ? 1 : 0, new Date().toISOString(), owned ? 1 : 0);
 }
-async function syncSet(setNum, owned = false) {
+async function syncSet(setNum, owned = false, includeSpares = false) {
   const { data: set } = await rb(`/sets/${encodeURIComponent(setNum)}/`);
   storeSet(set, owned);
   const existing = db.prepare('SELECT 1 FROM inventories WHERE set_num=? LIMIT 1').get(setNum);
-  if (existing) {
-    db.prepare('DELETE FROM inventories WHERE set_num=? AND is_spare=1').run(setNum);
-    if (owned) db.prepare('UPDATE inventories SET owned_quantity=MIN(quantity * (SELECT owned_quantity FROM sets WHERE set_num=?), owned_quantity + quantity) WHERE set_num=? AND is_spare=0').run(setNum, setNum);
+  if (existing && owned) db.prepare('UPDATE inventories SET owned_quantity=MIN(quantity * (SELECT owned_quantity FROM sets WHERE set_num=?), owned_quantity + quantity) WHERE set_num=? AND is_spare=0').run(setNum, setNum);
+  if (existing && !includeSpares) {
     return set;
   }
   let url = `/sets/${encodeURIComponent(setNum)}/parts/?page_size=1000`;
@@ -35,19 +34,45 @@ async function syncSet(setNum, owned = false) {
     ON CONFLICT(element_id) DO UPDATE SET color_id=excluded.color_id,color_name=excluded.color_name,name=excluded.name,image_url=COALESCE(excluded.image_url,parts.image_url)`);
   const putInventory = db.prepare('INSERT OR REPLACE INTO inventories(set_num,element_id,quantity,owned_quantity,color_id,is_spare) VALUES(?,?,?,?,?,?)');
   const tx = db.transaction(() => partRows.forEach(row => {
-    if (row.is_spare) return;
+    if (row.is_spare && !includeSpares) return;
+    if (existing && !row.is_spare) return;
     const design = String(row.part?.part_num || row.part?.part_num || 'unknown');
     const element = String(row.element_id || syntheticId(design, row.color?.id));
     putPart.run({ element_id: element, design_id: design, base_id: design, color_id: row.color?.id ?? null, color_name: row.color?.name ?? 'Unknown', part_num: row.part?.part_num ?? design, name: row.part?.name ?? design, image_url: row.part?.part_img_url ?? null });
-    putInventory.run(setNum, element, row.quantity, owned ? row.quantity : 0, row.color?.id ?? null, 0);
+    putInventory.run(setNum, element, row.quantity, owned ? row.quantity : 0, row.color?.id ?? null, Number(Boolean(row.is_spare)));
   })); tx();
   return set;
 }
 
+function createOwnedSetInstance(setNum, includeSpares = false, metadata = {}) {
+  const instance = db.prepare(`INSERT INTO owned_set_instances(set_num,custom_label,description,purchase_date,purchase_place,price,category,location)
+    VALUES(?,?,?,?,?,?,?,?)`).run(setNum, ...['custom_label', 'description', 'purchase_date', 'purchase_place', 'price', 'category', 'location'].map(key => String(metadata[key] || '')));
+  const sourceParts = db.prepare('SELECT element_id,quantity,is_spare FROM inventories WHERE set_num=? AND (is_spare=0 OR ?)').all(setNum, Number(includeSpares));
+  const addPart = db.prepare('INSERT INTO owned_set_parts(owned_set_id,element_id,quantity,owned_quantity,is_spare) VALUES(?,?,?,?,?)');
+  db.transaction(() => sourceParts.forEach(part => addPart.run(instance.lastInsertRowid, part.element_id, part.quantity, part.quantity, part.is_spare)))();
+  return instance.lastInsertRowid;
+}
+
 app.get('/api/health', (_, res) => res.json({ ok: true, configured: Boolean(process.env.REBRICKABLE_API_KEY) }));
-app.post('/api/sets/owned', async (req, res, next) => { try { const set = await syncSet(req.body.set_num, true); res.status(201).json(set); } catch (e) { next(e); } });
-app.post('/api/wishlist', async (req, res, next) => { try { const set = await syncSet(req.body.set_num); db.prepare('INSERT OR IGNORE INTO wishlist(set_num) VALUES(?)').run(set.set_num); res.status(201).json(set); } catch (e) { next(e); } });
-app.get('/api/sets/owned', (_, res) => res.json(db.prepare(`SELECT s.*,COALESCE((SELECT SUM(MAX(0,i.quantity*s.owned_quantity-i.owned_quantity)) FROM inventories i WHERE i.set_num=s.set_num AND i.is_spare=0 AND i.condition='missing'),0) AS missing_parts FROM sets s WHERE s.owned_quantity>0 ORDER BY s.name`).all()));
+app.get('/api/categories', (_, res) => {
+  const tags = new Map();
+  db.prepare("SELECT category FROM owned_set_instances WHERE TRIM(category) <> ''").all().forEach(({ category }) => String(category).split(',').map(tag => tag.trim()).filter(Boolean).forEach(tag => {
+    if (!tags.has(tag.toLowerCase())) tags.set(tag.toLowerCase(), tag);
+  }));
+  res.json([...tags.values()].sort((a, b) => a.localeCompare(b)));
+});
+app.post('/api/sets/owned', async (req, res, next) => { try { const set = await syncSet(req.body.set_num, false, Boolean(req.body.include_spares)); const instanceId = createOwnedSetInstance(set.set_num, Boolean(req.body.include_spares), req.body); res.status(201).json({ ...set, instance_id: instanceId }); } catch (e) { next(e); } });
+app.post('/api/wishlist', async (req, res, next) => { try { const set = await syncSet(req.body.set_num, false, Boolean(req.body.include_spares)); db.prepare('INSERT OR IGNORE INTO wishlist(set_num) VALUES(?)').run(set.set_num); res.status(201).json(set); } catch (e) { next(e); } });
+app.get('/api/sets/owned', (_, res) => res.json(db.prepare(`SELECT osi.id AS instance_id,s.*,1 AS owned_quantity,osi.notes,osi.custom_label,osi.description,osi.purchase_date,osi.purchase_place,osi.price,osi.category,osi.location,COALESCE((SELECT SUM(MAX(0,osp.quantity-osp.owned_quantity)) FROM owned_set_parts osp WHERE osp.owned_set_id=osi.id AND osp.is_spare=0 AND osp.condition='missing'),0) AS missing_parts,COALESCE((SELECT SUM(osp.quantity) FROM owned_set_parts osp WHERE osp.owned_set_id=osi.id AND osp.is_spare=1),0) AS spare_parts FROM owned_set_instances osi JOIN sets s ON s.set_num=osi.set_num ORDER BY s.name,osi.id`).all()));
+app.patch('/api/owned-sets/:instanceId', (req, res) => {
+  const instance = db.prepare('SELECT osi.id AS instance_id,s.*,1 AS owned_quantity,osi.notes,osi.custom_label,osi.description,osi.purchase_date,osi.purchase_place,osi.price,osi.category,osi.location FROM owned_set_instances osi JOIN sets s ON s.set_num=osi.set_num WHERE osi.id=?').get(req.params.instanceId);
+  if (!instance) return res.status(404).json({ error: 'Owned set not found' });
+  const fields = ['notes', 'custom_label', 'description', 'purchase_date', 'purchase_place', 'price', 'category', 'location'];
+  const updated = Object.fromEntries(fields.map(field => [field, req.body[field] === undefined ? instance[field] : String(req.body[field]) ]));
+  db.prepare(`UPDATE owned_set_instances SET ${fields.map(field => `${field}=?`).join(',')} WHERE id=?`).run(...fields.map(field => updated[field]), req.params.instanceId);
+  res.json({ ...instance, ...updated });
+});
+app.delete('/api/owned-sets/:instanceId', (req, res) => { db.prepare('DELETE FROM owned_set_instances WHERE id=?').run(req.params.instanceId); res.status(204).end(); });
 app.patch('/api/sets/:setNum', (req, res) => {
   const current = db.prepare('SELECT * FROM sets WHERE set_num=?').get(req.params.setNum);
   if (!current) return res.status(404).json({ error: 'Set not found' });
@@ -59,10 +84,16 @@ app.patch('/api/sets/:setNum', (req, res) => {
 });
 app.get('/api/sets/:setNum/parts', (req, res) => res.json(db.prepare(`
   SELECT i.element_id, i.quantity, i.owned_quantity AS set_owned_quantity, i.condition, i.notes, i.is_spare, p.name, p.design_id, p.color_name,
-    COALESCE((SELECT SUM(oi.owned_quantity) FROM inventories oi JOIN sets os ON os.set_num=oi.set_num WHERE oi.element_id=i.element_id AND oi.is_spare=0 AND os.owned_quantity>0), 0) AS total_owned
+    COALESCE((SELECT SUM(osp.owned_quantity) FROM owned_set_parts osp WHERE osp.element_id=i.element_id AND osp.is_spare=0), 0) AS total_owned
   FROM inventories i JOIN parts p ON p.element_id=i.element_id
   WHERE i.set_num=? ORDER BY i.is_spare, p.name
 `).all(req.params.setNum)));
+app.get('/api/owned-sets/:instanceId/parts', (req, res) => res.json(db.prepare(`
+  SELECT osp.element_id,osp.quantity,osp.owned_quantity AS set_owned_quantity,osp.condition,osp.notes,osp.is_spare,p.name,p.design_id,p.color_name,
+    COALESCE((SELECT SUM(all_parts.owned_quantity) FROM owned_set_parts all_parts WHERE all_parts.element_id=osp.element_id AND all_parts.is_spare=0),0) AS total_owned
+  FROM owned_set_parts osp JOIN parts p ON p.element_id=osp.element_id
+  WHERE osp.owned_set_id=? ORDER BY osp.is_spare,p.name
+`).all(req.params.instanceId)));
 app.get('/api/wishlist', (_, res) => res.json(db.prepare(`SELECT s.* FROM wishlist w JOIN sets s ON s.set_num=w.set_num ORDER BY w.added_at DESC`).all()));
 app.get('/api/wishlist/summary', (_, res) => res.json(db.prepare(`
   SELECT COUNT(DISTINCT i.element_id) AS unique_parts, COALESCE(SUM(i.quantity),0) AS total_parts
@@ -73,11 +104,20 @@ app.delete('/api/wishlist/:setNum', (req, res) => { db.prepare('DELETE FROM wish
 
 app.get('/api/inventory', (req, res) => {
   const group = req.query.group === 'design' ? 'design_id' : 'element_id';
-  const rows = db.prepare(`SELECT p.${group} AS key, MIN(p.element_id) AS element_id, MIN(p.name) AS name, MIN(p.design_id) AS design_id, MIN(p.base_id) AS base_id, MIN(p.color_name) AS color_name, SUM(i.owned_quantity) AS quantity
-    FROM inventories i JOIN sets s ON s.set_num=i.set_num JOIN parts p ON p.element_id=i.element_id WHERE s.owned_quantity>0 AND i.is_spare=0 GROUP BY p.${group} ORDER BY quantity DESC`).all();
+  const rows = db.prepare(`SELECT p.${group} AS key, MIN(p.element_id) AS element_id, MIN(p.name) AS name, MIN(p.design_id) AS design_id, MIN(p.base_id) AS base_id, MIN(p.color_name) AS color_name, SUM(osp.owned_quantity) AS quantity
+    FROM owned_set_parts osp JOIN parts p ON p.element_id=osp.element_id WHERE osp.is_spare=0 GROUP BY p.${group} ORDER BY quantity DESC`).all();
   res.json(rows);
 });
-app.get('/api/inventory/:elementId/breakdown', (req, res) => res.json(db.prepare(`SELECT s.set_num,s.name,s.image_url,s.owned_quantity,i.quantity,i.owned_quantity AS total,i.condition,MAX(0,i.quantity*s.owned_quantity-i.owned_quantity) AS missing_quantity FROM inventories i JOIN sets s ON s.set_num=i.set_num WHERE i.element_id=? AND s.owned_quantity>0`).all(req.params.elementId)));
+app.get('/api/inventory/:elementId/breakdown', (req, res) => res.json(db.prepare(`SELECT osi.id AS owned_set_id,s.set_num,s.name,s.image_url,1 AS owned_quantity,osp.quantity,osp.owned_quantity AS total,osp.condition,MAX(0,osp.quantity-osp.owned_quantity) AS missing_quantity FROM owned_set_parts osp JOIN owned_set_instances osi ON osi.id=osp.owned_set_id JOIN sets s ON s.set_num=osi.set_num WHERE osp.element_id=? AND osp.is_spare=0`).all(req.params.elementId)));
+app.patch('/api/owned-sets/:instanceId/parts/:elementId', (req, res) => {
+  const part = db.prepare('SELECT * FROM owned_set_parts WHERE owned_set_id=? AND element_id=? AND is_spare=0').get(req.params.instanceId, req.params.elementId);
+  if (!part) return res.status(404).json({ error: 'Part not found in this owned set' });
+  const ownedQuantity = req.body.owned_quantity === undefined ? part.owned_quantity : Math.min(part.quantity, Math.max(0, Number(req.body.owned_quantity) || 0));
+  const condition = ['complete', 'missing', 'broken'].includes(req.body.condition) ? req.body.condition : part.condition;
+  const notes = req.body.notes === undefined ? part.notes : String(req.body.notes);
+  db.prepare('UPDATE owned_set_parts SET owned_quantity=?,condition=?,notes=? WHERE id=?').run(ownedQuantity, condition, notes, part.id);
+  res.json({ element_id: part.element_id, quantity: part.quantity, set_owned_quantity: ownedQuantity, condition, notes, total_owned: db.prepare('SELECT COALESCE(SUM(owned_quantity),0) AS total FROM owned_set_parts WHERE element_id=? AND is_spare=0').get(part.element_id).total });
+});
 app.patch('/api/sets/:setNum/parts/:elementId', (req, res) => {
   const item = db.prepare('SELECT i.*,s.owned_quantity AS set_quantity FROM inventories i JOIN sets s ON s.set_num=i.set_num WHERE i.set_num=? AND i.element_id=? AND i.is_spare=0').get(req.params.setNum, req.params.elementId);
   if (!item) return res.status(404).json({ error: 'Part not found in this owned set' });
@@ -98,7 +138,7 @@ app.patch('/api/parts/:elementId/normalization', (req, res) => {
 
 function completeness(setNum) {
   const needed = db.prepare(`SELECT p.*,SUM(i.quantity) quantity FROM inventories i JOIN parts p ON p.element_id=i.element_id WHERE i.set_num=? AND i.is_spare=0 GROUP BY i.element_id`).all(setNum);
-  const owned = db.prepare(`SELECT p.*,SUM(i.owned_quantity) quantity FROM inventories i JOIN sets s ON s.set_num=i.set_num JOIN parts p ON p.element_id=i.element_id WHERE s.owned_quantity>0 AND i.is_spare=0 GROUP BY i.element_id`).all();
+  const owned = db.prepare(`SELECT p.*,SUM(osp.owned_quantity) quantity FROM owned_set_parts osp JOIN parts p ON p.element_id=osp.element_id WHERE osp.is_spare=0 GROUP BY osp.element_id`).all();
   const required = needed.reduce((sum, x) => sum + x.quantity, 0); if (!required) return { strict: 0, loose: 0, required: 0, matched_strict: 0, matched_loose: 0 };
   const strict = needed.reduce((sum, n) => sum + Math.min(n.quantity, owned.find(o => o.element_id === n.element_id)?.quantity || 0), 0);
   const ownedByKey = new Map();

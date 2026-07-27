@@ -4,6 +4,26 @@ All notable changes to Percu BrickMaster are documented in this file.
 
 The project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Add changes to **Unreleased** during development, then move them into a versioned section when creating a GitHub release.
 
+## [1.1.0] - 2026-07-27
+
+### Added
+
+- Owned Sets are now tracked as individual physical items, so duplicate copies keep separate part condition, spare-part, and deletion records.
+- Per-set details for custom label, description, purchase date and place, price, storage location, notes, and category tags.
+- Reusable category tags with existing-tag suggestions, visible tags on Owned Set cards, and category-aware search.
+- Optional spare-part import when adding a set, plus spare sections and green spare-count indicators in Owned Set cards and detail views.
+- Missing-piece totals and a red set-image badge in Owned Set details.
+- Wishlist-only sorting by Strict or Loose completion percentage.
+
+### Changed
+
+- Owned Set detail pages use the available space for editable set details instead of a redundant individual-item status panel.
+- Price accepts formatted currency values such as `€49.99` or `$49.99`.
+- Wishlist removal now happens from the opened Wishlist Set with a confirmation dialog, matching the Owned Set workflow.
+- Wishlist detail quantity is labelled “Quantity wanted.”
+- Search help text now includes category tags, and the search control is wider.
+- Collection filter and sort controls have aligned, stable desktop positioning.
+
 ## [1.0.2] - 2026-07-24
 
 ### Added

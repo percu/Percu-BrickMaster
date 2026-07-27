@@ -87,4 +87,3 @@ SQLite data is stored under `data/`. Part images and thumbnails are cached local
 ## Item Part from Inventory
 
 <img width="1176" height="902" alt="image" src="https://github.com/user-attachments/assets/b58e5622-21e1-418b-b8d3-479f38e56ecd" />
-
