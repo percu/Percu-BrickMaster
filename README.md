@@ -70,15 +70,15 @@ SQLite data is stored under `data/`. Part images and thumbnails are cached local
 
 ## Main Screen
 
-<img width="1024" height="1017" alt="image" src="https://github.com/user-attachments/assets/0194fab6-c59d-4cf4-b80f-ca3493d8b02d" />
+<img width="1023" height="976" alt="image" src="https://github.com/user-attachments/assets/aa7e1561-b323-4fd7-9b16-d07a0ba51063" />
 
 ## Owned Set Parts
 
-<img width="1025" height="978" alt="image" src="https://github.com/user-attachments/assets/0f0c407d-fc9c-41f7-825a-3c198415aefe" />
+<img width="917" height="1151" alt="image" src="https://github.com/user-attachments/assets/44105640-e343-48d5-b210-7e4ca1b034ab" />
 
 ## Item Part from an Owned Set
 
-<img width="918" height="522" alt="image" src="https://github.com/user-attachments/assets/8fa76e75-8f28-460c-8527-e84f1d5b50ae" />
+<img width="921" height="874" alt="image" src="https://github.com/user-attachments/assets/dcd69463-b35a-40d3-9933-730e16bdc2f4" />
 
 ## Inventory Screen
 
@@ -86,4 +86,5 @@ SQLite data is stored under `data/`. Part images and thumbnails are cached local
 
 ## Item Part from Inventory
 
-<img width="759" height="795" alt="image" src="https://github.com/user-attachments/assets/0c66ba27-6129-42e1-a150-ada7b8558a69" />
+<img width="1176" height="902" alt="image" src="https://github.com/user-attachments/assets/b58e5622-21e1-418b-b8d3-479f38e56ecd" />
+
