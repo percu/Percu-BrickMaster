@@ -4,6 +4,26 @@ All notable changes to Percu BrickMaster are documented in this file.
 
 The project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Add changes to **Unreleased** during development, then move them into a versioned section when creating a GitHub release.
 
+## [1.1.1] - 2026-08-07
+
+### Added
+
+- GitHub header artwork for project branding.
+- Explicit green spare-piece counts in Inventory and Owned Set part-location details.
+- Missing-piece counts on Wishlist set cards, calculated from exact Strict completion requirements.
+
+### Changed
+
+- Imported spare pieces now contribute to standard Inventory quantities, collection-wide ownership totals, and both Strict and Loose Wishlist completeness.
+- Part-location breakdowns consolidate standard and spare copies from the same Owned Set into one row.
+- Part quantities now distinguish combined set quantity (`Qty`), owned standard quantity (`Total`), and included spare quantity (`Spare`).
+
+### Fixed
+
+- Broken pieces now count as unavailable in Owned Set totals, filters, warnings, and part-condition displays.
+- Part-condition quantities refresh after saving, so a single missing or broken piece correctly displays `0 / 1`.
+- Prevented part-detail observer update loops that could make the page unresponsive when opening pieces with spare or condition information.
+
 ## [1.1.0] - 2026-07-27
 
 ### Added
